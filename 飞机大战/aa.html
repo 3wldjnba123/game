@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+ 
+        #view {
+            margin: 0 auto;
+            width: 400px;
+            height: 680px;
+            background-color: #00b4ff;
+            opacity: 0.9;
+            position: relative;
+        }
+ 
+        /*自己飞机的样式*/
+        #air {
+            width: 34px;
+            height: 26px;
+            position: absolute;
+            background-color: palegreen;
+        }
+ 
+        /*敌机的样式*/
+        .hair {
+            width: 34px;
+            height: 26px;
+            position: absolute;
+            background-color: darkmagenta;
+        }
+ 
+        /*子弹的样式*/
+        .bullet {
+            width: 4px;
+            height: 10px;
+            position: absolute;
+            background-color: red;
+        }
+        h1{
+            position: absolute;
+            top: 300px;
+            left: 700px;
+        }
+    </style>
+ 
+</head>
+<body>
+<div id="view">
+</div>
+<h1 id="h1">0</h1>
+</body>
+<script>
+    //获取区域
+    let view = document.getElementById('view');
+    // 创建自己的飞机
+    let air = document.createElement('div');
+    let count=0
+    let  h1=document.getElementById('h1')
+    air.id = 'air'
+    document.body.appendChild(air)
+    document.onmousemove = function (e) {
+        e = e || window.event
+        // 边距
+        let aX = view.offsetLeft < e.clientX - air.offsetWidth / 2 && e.clientX + air.offsetWidth / 2 < view.offsetLeft + view.offsetWidth
+        let aY = view.offsetTop < e.clientY - air.offsetHeight / 2 && e.clientY + air.offsetHeight / 2 < view.offsetTop + view.offsetHeight
+        if (aX && aY) {
+            air.style.left = e.clientX - air.offsetWidth / 2 + 'px';
+            air.style.top = e.clientY - air.offsetHeight / 2 + 'px'
+            ObJ_billet.bif = true
+        }
+    }
+    //监听飞机子弹
+    let GAME_time = setInterval(function () {
+    //搜索所有的子弹，相遇 就被击毙。相遇条件 飞机左<=left 子弹<=you     top 子弹<=飞机
+    for (let i = 0; i < ObJ_billet.arr.length; i++) {
+        let barr = ObJ_billet.arr[i].split('|')
+        for (let j = 0; j < ObJ_Hair.arr.length; j++) {
+            let harr = ObJ_Hair.arr[j].split('|')//id x y
+            if (document.getElementById(barr[0]) && document.getElementById(harr[0])) {
+                console.log(1)
+                let yif = parseInt(barr[2])+3 <= parseInt(harr[2]) //Y相遇
+                let xif = parseInt(barr[1]) >= parseInt(harr[1]) && parseInt(barr[1]) <= parseInt(harr[1]) + 25
+                if (yif && xif) {
+                    count++;
+                    h1.innerText=count+''
+                    //消失元素 关闭记时器
+                    let billet_a = document.getElementById(barr[0])
+                    let hair_a = document.getElementById(harr[0])//获取敌机
+ 
+                    billet_a.parentNode.removeChild(billet_a)//删除子弹
+                    hair_a.parentNode.removeChild(hair_a)//删除敌机
+                    // clearInterval(runBl_time)
+                    //clearInterval(runHair_time)
+                }
+            }
+        }
+    }
+    },100)
+    let caerBl_time = setInterval(
+        function () {
+            if (ObJ_billet.bif) {
+                //在自己飞机的上方
+                caeationBillet()
+                caeationHair()
+ 
+            }
+        }, 1000)
+ 
+    //用来保存子弹数据
+    let ObJ_billet = {
+        name: 'billet_',
+        num: 0,
+        bif: false,
+        //是否在区域
+        arr: []//保存id，xy坐标
+    }
+    let ObJ_Hair = {
+        name: 'hair_',
+        num: 0,
+        arr: []//保存id，xy坐标
+    }
+    // let runBl_time = null;//子弹定时器
+    // let runHair_time = null;//飞机定时器
+    // // 子弹运动
+    function run_Billet(element, i) {
+       let runBl_time = setInterval(function () {
+            element.style.top = element.offsetTop - 1 + 'px'
+            ObJ_billet.arr[i] = element.id + '|' + element.offsetLeft + '|' + element.offsetTop
+            // 超出边界消失
+            if (element.offsetTop < 0) {
+                element.parentNode.removeChild(element);
+                 clearInterval(runBl_time)
+            }
+        }, 30)
+    }
+ 
+    // 敌机运动
+    function run_Hair(element, i) {
+      let runHair_time = setInterval(function () {
+            element.style.top = element.offsetTop + 1 + 'px'
+ 
+            ObJ_Hair.arr[i] = element.id + '|' + element.offsetLeft + '|' + element.offsetTop + '|' + ''
+            // 超出边界消失
+            if (element.offsetTop > view.offsetHeight - element.offsetHeight) {
+                element.parentNode.removeChild(element);
+                clearInterval(runHair_time)
+            }
+        }, 30)
+    }
+ 
+    //创建子弹
+    function caeationBillet() {
+        let billet = document.createElement('div')
+        billet.className = 'bullet'
+        billet.id = ObJ_billet.name + ObJ_billet.num;
+        document.body.appendChild(billet)
+        //子弹在飞机上方
+        billet.style.left = air.offsetLeft + air.offsetWidth / 2 + 'px'
+        billet.style.top = air.offsetTop - billet.offsetHeight - 1 + 'px'
+        //保存数据
+        ObJ_billet.arr[ObJ_billet.num] = billet.id + '|' + billet.offsetLeft + '|' + billet.offsetTop + '|' + '1'
+        //子弹运动
+        run_Billet(billet, ObJ_billet.num)
+        // 自增1
+        ObJ_billet.num += 1
+        //挡子弹有最多50个
+        if (ObJ_billet.num >= 50) {
+            ObJ_billet.num = 0;
+        }
+    }
+ 
+    // 创建敌机
+    function caeationHair() {
+        let hair = document.createElement('div')
+        hair.className = 'hair'
+        hair.id = ObJ_Hair.name + ObJ_Hair.num;
+        document.body.appendChild(hair)
+        //飞机由上往下 left随机大小0到view宽度
+        let random_L = randomNum(view.offsetLeft, view.offsetLeft + view.offsetWidth - hair.offsetWidth)
+        hair.style.left = random_L + 'px'
+        hair.style.top = 0 + 'px'
+        ObJ_Hair.arr[ObJ_Hair.num] = hair.id + '|' + hair.offsetLeft + '|' + hair.offsetTop
+ 
+        run_Hair(hair, ObJ_Hair.num)
+        // 自增1
+        ObJ_Hair.num += 1
+        //飞机有最多100个
+        if (ObJ_Hair.num >= 50) {
+            ObJ_Hair.num = 0;
+        }
+    }
+ 
+    //生成从minNum到maxNum的随机数
+    function randomNum(minNum, maxNum) {
+        return parseInt(Math.random() * (maxNum - minNum + 1) + minNum)
+ 
+    }
+ 
+</script>
+</html>

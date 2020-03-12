@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>飞机大战</title>
+
+		<style type="text/css">
+			body {
+				margin: 0;
+				background-image: url(img/yun.jpg);
+			}
+
+			@media screen and (min-width: 600px) and (max-width:800px) {
+				body {
+					background-color: yellow;
+					background-image: initial;
+				}
+			}
+
+			#box {
+				margin: 50px auto 0 auto;
+				width: 60%;
+				height: 400px;
+				border: 2px solid white;
+				position: relative;
+			}
+
+			#plane {
+				width: 35px;
+				height: 27px;
+				border: 0.5px solid black;
+				/* 图片 */
+				background-image: url(./img/plane.jpg);
+				background-repeat: no-repeat;
+				background-position: 99% -9px;
+				background-size: 218px;
+				transform: rotate(180deg);
+				/* 飞机定位 */
+				position: absolute;
+				left: 50%;
+				top: 92%;
+				cursor: pointer;
+
+			}
+		</style>
+	</head>
+	<body>
+		<div id="box">
+			<div id="plane"></div>
+		</div>
+
+		<script src="utils/index.js" type="text/javascript" charset="utf-8"></script>
+		<script type="text/javascript">
+			/* 思路			
+			1， 动态创建自己的飞机 让它在规定的区域， 跟着鼠标运动。
+			2， 在自己飞机的上方， 间隔1s生成子弹。 子弹往上移动 当top： 0 子弹消失
+			3， 每隔1s 产生敌机 top 0, left 随机， 敌机向下移动， 敌机超过边距时。 敌机消失。
+			4， 子弹和敌机相遇时。 子弹和敌机同时消失
+			 */
+			(function() {
+				class Plane {
+					constructor({
+						el
+					}) {
+						// this.dragging = false;
+						this.el = el;
+						this.$pnode = el.parentNode;
+						this.init();
+					}
+					init() {
+						this.mousedown(); // 飞机移动
+					}
+					mousedown() {
+						this.el.onmousedown = (e) => {
+							// 思路：计算出飞机左/上边框与鼠标的初始间隔距离，后面再用鼠标坐标减去就可得到飞机需要赋值的移动数值
+							let intervalX = e.clientX - this.el.offsetLeft;
+							let intervalY = e.clientY - this.el.offsetTop;
+							// 鼠标移动/松开事件监听对象是document！而不是飞机，让飞机跟着鼠标的速度移动，而不是鼠标跟着飞机
+							this.mousemove(intervalX, intervalY);
+							this.mouseup();
+						}
+					}
+					mousemove(intervalX, intervalY) {
+						document.onmousemove = (e) => {
+							// 飞机鼠标移动的位置坐标
+							let x = e.clientX - intervalX;
+							let y = e.clientY - intervalY;
+							// 控制飞机在box中最大的坐标值，因为飞机的绝对定位对应的相对定位是父级box，所以最小坐标为0
+							let maxX = this.$pnode.clientWidth - this.el.offsetWidth;
+							let maxY = this.$pnode.clientHeight - this.el.offsetHeight;
+							// 反向思维！
+							// max用来控制最小值0，当x大于0时，正常取值x，但是当x小于0时，值为0！假设赋值给x
+							// min用来控制最大值maxX，当x小于maxX时，正常取值x，但是当x大于maxX时，值为maxX！
+							x = Math.min(Math.max(0, x), maxX);
+							y = Math.min(Math.max(0, y), maxY);
+							// 给元素及时定位
+							this.el.style.left = x + "px";
+							this.el.style.top = y + "px";
+						}
+					}
+					mouseup() {
+						document.onmouseup = (e) => { // 松开鼠标则释放鼠标移动/松开事件
+							document.onmousemove = null;
+							document.onmouseup = null;
+						}
+					}
+				}
+				const el = document.querySelector("#plane");
+				const p = new Plane({
+					el
+				});
+			})();
+		</script>
+	</body>
+</html>

@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>飞机大战</title>
+
+		<style type="text/css">
+			body {
+				margin: 0;
+				background-image: url(img/yun.jpg);
+			}
+
+			@media screen and (min-width: 600px) and (max-width:800px) {
+				body {
+					background-color: yellow;
+					background-image: initial;
+				}
+			}
+
+			#box {
+				margin: 50px auto 0 auto;
+				width: 60%;
+				height: 700px;
+				border: 2px solid white;
+				position: relative;
+				overflow: auto;
+			}
+
+			#plane {
+				width: 35px;
+				height: 27px;
+				border: 0.5px solid black;
+				/* 图片 */
+				background-image: url(./img/plane.jpg);
+				background-repeat: no-repeat;
+				background-position: 99% -9px;
+				background-size: 218px;
+				/* transform: rotate(180deg); */
+				/* 飞机定位 */
+				position: absolute;
+				left: 50%;
+				top: 92%;
+				cursor: pointer;
+
+			}
+
+			.bullet {
+				width: 5px;
+				height: 10px;
+				background-color: #FFFF00;
+				position: absolute;
+			}
+
+			.hostile {
+				width: 35px;
+				height: 27px;
+				background-color: skyblue;
+				position: absolute;
+			}
+
+			#start_end {
+				position: absolute;
+				left: 48%;
+				top: 50%;
+				cursor: pointer;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="plane"></div>
+
+		<script src="utils/index.js" type="text/javascript" charset="utf-8"></script>
+		<script type="text/javascript">
+			/* 思路			
+			1， 动态创建自己的飞机 让它在规定的区域， 跟着鼠标运动。
+			2， 在自己飞机的上方， 间隔1s生成子弹。 子弹往上移动 当top： 0 子弹消失
+			3， 每隔1s 产生敌机 top 0, left 随机， 敌机向下移动， 敌机超过边距时。 敌机消失。
+			4， 子弹和敌机相遇时。 子弹和敌机同时消失
+			 */
+			(function() {
+				class Plane {
+					constructor({
+						el
+					}) {
+						const $pnode = document.createElement("div");
+						$pnode.id = "box";
+						document.body.appendChild($pnode);
+						$pnode.appendChild(el);
+						this.$pnode = $pnode;
+						this.el = el;
+						this.$bulletNode = {};
+						this.timer1 = null; // 制造子弹的计时器
+						this.delay1 = 800; // 制造子弹的时间
+						this.delay2 = 100; // 子弹移速的时间
+						this.bulletYnum = 5 // 设置越大子弹间隔越大，必须大于0
+						this.hostileTimer1 = null; // 制造敌机的计时器
+						this.hostileDelay1 = 1000; //制造敌机的时间
+						this.hostileDelay2 = 20; // 敌机移速的时间
+						this.hostileYnum = 1;
+						this.gameover = false; // 判断游戏开始/结束，用getter/setter监听
+						this.init();
+					}
+					init() {
+						// 游戏初始画面
+						let $butStartEnd = document.createElement("button");
+						this.$butStartEnd = $butStartEnd;
+						$butStartEnd.id = "start_end";
+						this.$pnode.insertBefore($butStartEnd, this.el);
+						if (!this.gameover) {
+							$butStartEnd.innerHTML = "开始游戏";
+							$butStartEnd.onclick = (e) => {
+								$butStartEnd.style.display = "none";
+								// 飞机移动
+								this.mousedown();
+								// 子弹
+								this.bullet();
+								// 敌机
+								this.hostilePlane();
+							}
+						}
+					}
+					set gameover(boole) {
+						console.log("setter", boole);
+						if (boole && this.timer1) {
+							// 停止制造子弹
+							clearInterval(this.timer1);
+							this.timer1 = null;
+							// 停止制造敌机
+							clearInterval(this.hostileTimer1);
+							this.hostileTimer1 = null;
+							// 释放鼠标事件 or pointer-events = "none" 禁止触发div事件。 如果一个元素执行多个addEventListener('click',fn1),会多次执行,removeEventListener('click',fn1);
+							this.el.onmousedown = null;
+							document.onmousemove = null;
+							document.onmouseup = null;
+							// 游戏结束画面 ？
+							this.$butStartEnd.innerHTML = "游戏结束-重新开始";
+							this.$butStartEnd.style.display = "block";
+						}
+						this._gameover = boole;
+					}
+					get gameover() {
+						return this._gameover;
+					}
+					hostilePlane() {
+						let hostileKey = 0;
+						this.hostileTimer1 = setInterval(() => {
+							// 创建敌机
+							const targetNode = document.createElement("div");
+							targetNode.className = "hostile";
+							targetNode.setAttribute("key", hostileKey++);
+							this.$pnode.insertBefore(targetNode, this.el);
+							// 敌机飞行轨迹速度
+							let hostileX = Math.floor(Math.random() * (this.$pnode.clientWidth - targetNode.offsetWidth + 1)) + 0,
+								hostileY = 0 - targetNode.offsetHeight;
+							this.style(targetNode, hostileX, hostileY);
+							const targetTimer = setInterval(() => {
+								hostileY += this.hostileYnum > 0 ? this.hostileYnum : 1;
+								this.style(targetNode, hostileX, hostileY);
+								// 删除敌机
+								let tL = targetNode.offsetLeft,
+									tT = targetNode.offsetTop,
+									tW = targetNode.offsetWidth,
+									tH = targetNode.offsetHeight;
+								if (tT > this.$pnode.clientHeight - tH) {
+									this.$pnode.removeChild(targetNode);
+									clearInterval(targetTimer); // 删除对应的计时器
+								}
+								let obj = this.$bulletNode; // 得到飞机子弹对象集合
+								for (let k in obj) {
+									if (obj.hasOwnProperty(k)) {
+										let selfBullet = obj[k], // 击中敌机的子弹
+											oL = selfBullet.offsetLeft,
+											oT = selfBullet.offsetTop,
+											oW = selfBullet.offsetWidth,
+											oH = selfBullet.offsetHeight;
+										if (oL + oW >= tL && oL <= tL + tW && oT <= tT + tH && oT + oH >= tT) { //子弹接触了敌机矩形范围内（包括边缘）
+											this.$pnode.removeChild(targetNode);
+											delete obj[k]; // 删除子弹对象属性就行了，这颗子弹就失效了，这样对元素隐身就行，当前子弹元素还是让子弹计数器里面去删，。
+											selfBullet.style.display = "none"; //如果在这里删除子弹元素，在子弹计时器里删除这颗子弹没有会报错
+											clearInterval(targetTimer); // 删除对应的敌机计时器
+											break;
+										}
+									}
+								}
+								// 游戏结束
+								let el = this.el,
+									pL = el.offsetLeft,
+									pT = el.offsetTop,
+									pW = el.offsetWidth,
+									pH = el.offsetHeight;
+								if (pL + pW >= tL && pL <= tL + tW && pT <= tT + tH && pT + pH >= tT) { // 飞机接触了敌机矩形范围内（包括边缘）
+									this.gameover = true;
+								}
+							}, this.hostileDelay2);
+						}, this.hostileDelay1);
+
+					}
+					bullet() {
+						let proxy = new Proxy(this.$bulletNode, { // proxy，getter/setter
+								set: (target, key, value) => { // 新增了子弹
+									target[key] = value;
+									return true;
+								},
+								get: function(target, key) { // 调用了当前子弹
+									return target[key];
+								}
+							}),
+							bulletKey = 0; // 每一颗子弹的唯一ID
+						this.timer1 = setInterval(() => {
+							// 创建子弹
+							const targetNode = proxy[`${bulletKey}`] = document.createElement("div");
+							targetNode.className = "bullet";
+							targetNode.setAttribute("key", bulletKey++);
+							this.$pnode.appendChild(targetNode);
+							// 子弹飞行轨迹速度（bulletX，bulletY，this.bulletYnum，this.delay2）
+							let bulletX = this.el.offsetLeft + this.el.clientWidth / 2,
+								bulletY = this.el.offsetTop - targetNode.offsetHeight;
+							this.style(targetNode, bulletX, bulletY); //解决初始子弹定位;
+							const targetTimer = setInterval(() => {
+								bulletY -= this.bulletYnum > 0 ? this.bulletYnum : 1; // 设置越大子弹间隔越大
+								this.style(targetNode, bulletX, bulletY);
+								// 删除子弹
+								if (targetNode.offsetTop <= -targetNode.offsetHeight) {
+									delete proxy[targetNode.getAttribute("key")]; // 删除飞机对象对应的属性
+									this.$pnode.removeChild(targetNode);
+									clearInterval(targetTimer); // 删除子弹对应的计时器
+								}
+							}, this.delay2)
+						}, this.delay1);
+					}
+					style(targetNode, bulletX, bulletY) {
+						targetNode.style.left = bulletX + "px";
+						targetNode.style.top = bulletY + "px";
+					}
+					mousedown() {
+						this.el.onmousedown = (e) => {
+							// 思路：计算出飞机左/上边框与鼠标的初始间隔距离，后面再用鼠标坐标减去就可得到飞机需要赋值的移动数值！
+							let intervalX = e.clientX - this.el.offsetLeft;
+							let intervalY = e.clientY - this.el.offsetTop;
+							// 鼠标移动/松开事件监听对象是document！而不是飞机，让飞机跟着鼠标的速度移动，而不是鼠标跟着飞机
+							this.mousemove(intervalX, intervalY);
+							this.mouseup();
+						}
+					}
+					mousemove(intervalX, intervalY) {
+						document.onmousemove = (e) => {
+							// 飞机鼠标移动的位置坐标
+							let x = e.clientX - intervalX;
+							let y = e.clientY - intervalY;
+							// 控制飞机在box中最大的坐标值，因为飞机的绝对定位对应的相对定位是父级box，所以最小坐标为0
+							let maxX = this.$pnode.clientWidth - this.el.offsetWidth;
+							let maxY = this.$pnode.clientHeight - this.el.offsetHeight;
+							// 反向思维！
+							// max用来控制最小值0，当x大于0时，正常取值x，但是当x小于0时，值为0！假设赋值给x
+							// min用来控制最大值maxX，当x小于maxX时，正常取值x，但是当x大于maxX时，值为maxX！
+							x = Math.min(Math.max(0, x), maxX);
+							y = Math.min(Math.max(0, y), maxY);
+							// 给元素及时定位
+							this.style(this.el, x, y);
+						}
+					}
+					mouseup() {
+						document.onmouseup = (e) => { // 松开鼠标则释放鼠标移动/松开事件 （考虑改为暂停或者取掉不需要按住也可以移动，要不然一直按住是有点累……）？
+							// document.onmousemove = null;
+							// document.onmouseup = null;
+						}
+					}
+				}
+				const el = document.querySelector("#plane");
+				const p = new Plane({
+					el
+				});
+			})();
+		</script>
+	</body>
+</html>
