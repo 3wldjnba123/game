@@ -21,7 +21,7 @@
 			#box {
 				margin: 50px auto 0 auto;
 				width: 60%;
-				height: 700px;
+				height: 350px;
 				border: 2px solid white;
 				position: relative;
 				overflow: auto;
@@ -90,15 +90,16 @@
 						this.$pnode = $pnode;
 						this.el = el;
 						this.$bulletNode = {};
-						this.timer1 = null; // 制造子弹的计时器
+						this.bulletTimer = null; // 制造子弹的计时器
 						this.delay1 = 800; // 制造子弹的时间
 						this.delay2 = 100; // 子弹移速的时间
 						this.bulletYnum = 5 // 设置越大子弹间隔越大，必须大于0
-						this.hostileTimer1 = null; // 制造敌机的计时器
+						this.hostileTimer = null; // 制造敌机的计时器
 						this.hostileDelay1 = 1000; //制造敌机的时间
 						this.hostileDelay2 = 20; // 敌机移速的时间
 						this.hostileYnum = 1;
 						this.gameover = false; // 判断游戏开始/结束，用getter/setter监听
+						this.pauseGame = false; // 暂停游戏
 						this.init();
 					}
 					init() {
@@ -122,13 +123,13 @@
 					}
 					set gameover(boole) {
 						console.log("setter", boole);
-						if (boole && this.timer1) {
+						if (boole && this.bulletTimer) {
 							// 停止制造子弹
-							clearInterval(this.timer1);
-							this.timer1 = null;
+							clearInterval(this.bulletTimer);
+							this.bulletTimer = null;
 							// 停止制造敌机
-							clearInterval(this.hostileTimer1);
-							this.hostileTimer1 = null;
+							clearInterval(this.hostileTimer);
+							this.hostileTimer = null;
 							// 释放鼠标事件 or pointer-events = "none" 禁止触发div事件。 如果一个元素执行多个addEventListener('click',fn1),会多次执行,removeEventListener('click',fn1);
 							this.el.onmousedown = null;
 							document.onmousemove = null;
@@ -139,60 +140,64 @@
 						}
 						this._gameover = boole;
 					}
-					get gameover() {
-						return this._gameover;
-					}
+					// get gameover() {  // getter 不可单独出现
+					// 	return this._gameover;
+					// }
 					hostilePlane() {
 						let hostileKey = 0;
-						this.hostileTimer1 = setInterval(() => {
-							// 创建敌机
-							const targetNode = document.createElement("div");
-							targetNode.className = "hostile";
-							targetNode.setAttribute("key", hostileKey++);
-							this.$pnode.insertBefore(targetNode, this.el);
-							// 敌机飞行轨迹速度
-							let hostileX = Math.floor(Math.random() * (this.$pnode.clientWidth - targetNode.offsetWidth + 1)) + 0,
-								hostileY = 0 - targetNode.offsetHeight;
-							this.style(targetNode, hostileX, hostileY);
-							const targetTimer = setInterval(() => {
-								hostileY += this.hostileYnum > 0 ? this.hostileYnum : 1;
+						this.hostileTimer = setInterval(() => {
+							if (!this.pauseGame) {
+								// 创建敌机
+								const targetNode = document.createElement("div");
+								targetNode.className = "hostile";
+								targetNode.setAttribute("key", hostileKey++);
+								this.$pnode.insertBefore(targetNode, this.el);
+								// 敌机飞行轨迹速度
+								let hostileX = Math.floor(Math.random() * (this.$pnode.clientWidth - targetNode.offsetWidth + 1)) + 0,
+									hostileY = 0 - targetNode.offsetHeight;
 								this.style(targetNode, hostileX, hostileY);
-								// 删除敌机
-								let tL = targetNode.offsetLeft,
-									tT = targetNode.offsetTop,
-									tW = targetNode.offsetWidth,
-									tH = targetNode.offsetHeight;
-								if (tT > this.$pnode.clientHeight - tH) {
-									this.$pnode.removeChild(targetNode);
-									clearInterval(targetTimer); // 删除对应的计时器
-								}
-								let obj = this.$bulletNode; // 得到飞机子弹对象集合
-								for (let k in obj) {
-									if (obj.hasOwnProperty(k)) {
-										let selfBullet = obj[k], // 击中敌机的子弹
-											oL = selfBullet.offsetLeft,
-											oT = selfBullet.offsetTop,
-											oW = selfBullet.offsetWidth,
-											oH = selfBullet.offsetHeight;
-										if (oL + oW >= tL && oL <= tL + tW && oT <= tT + tH && oT + oH >= tT) { //子弹接触了敌机矩形范围内（包括边缘）
+								const targetTimer = setInterval(() => {
+									if (!this.pauseGame) {
+										hostileY += this.hostileYnum > 0 ? this.hostileYnum : 1;
+										this.style(targetNode, hostileX, hostileY);
+										// 删除敌机
+										let tL = targetNode.offsetLeft,
+											tT = targetNode.offsetTop,
+											tW = targetNode.offsetWidth,
+											tH = targetNode.offsetHeight;
+										if (tT > this.$pnode.clientHeight - tH) {
 											this.$pnode.removeChild(targetNode);
-											delete obj[k]; // 删除子弹对象属性就行了，这颗子弹就失效了，这样对元素隐身就行，当前子弹元素还是让子弹计数器里面去删，。
-											selfBullet.style.display = "none"; //如果在这里删除子弹元素，在子弹计时器里删除这颗子弹没有会报错
-											clearInterval(targetTimer); // 删除对应的敌机计时器
-											break;
+											clearInterval(targetTimer); // 删除对应的计时器
+										}
+										let obj = this.$bulletNode; // 得到飞机子弹对象集合
+										for (let k in obj) {
+											if (obj.hasOwnProperty(k)) {
+												let selfBullet = obj[k], // 击中敌机的子弹
+													oL = selfBullet.offsetLeft,
+													oT = selfBullet.offsetTop,
+													oW = selfBullet.offsetWidth,
+													oH = selfBullet.offsetHeight;
+												if (oL + oW >= tL && oL <= tL + tW && oT <= tT + tH && oT + oH >= tT) { //子弹接触了敌机矩形范围内（包括边缘）
+													this.$pnode.removeChild(targetNode);
+													delete obj[k]; // 删除子弹对象属性就行了，这颗子弹就失效了，这样对元素隐身就行，当前子弹元素还是让子弹计数器里面去删，。
+													selfBullet.style.display = "none"; //如果在这里删除子弹元素，在子弹计时器里删除这颗子弹没有会报错
+													clearInterval(targetTimer); // 删除对应的敌机计时器
+													break;
+												}
+											}
+										}
+										// 游戏结束
+										let el = this.el,
+											pL = el.offsetLeft,
+											pT = el.offsetTop,
+											pW = el.offsetWidth,
+											pH = el.offsetHeight;
+										if (pL + pW >= tL && pL <= tL + tW && pT <= tT + tH && pT + pH >= tT) { // 飞机接触了敌机矩形范围内（包括边缘）
+											this.gameover = true;
 										}
 									}
-								}
-								// 游戏结束
-								let el = this.el,
-									pL = el.offsetLeft,
-									pT = el.offsetTop,
-									pW = el.offsetWidth,
-									pH = el.offsetHeight;
-								if (pL + pW >= tL && pL <= tL + tW && pT <= tT + tH && pT + pH >= tT) { // 飞机接触了敌机矩形范围内（包括边缘）
-									this.gameover = true;
-								}
-							}, this.hostileDelay2);
+								}, this.hostileDelay2);
+							}
 						}, this.hostileDelay1);
 
 					}
@@ -207,26 +212,30 @@
 								}
 							}),
 							bulletKey = 0; // 每一颗子弹的唯一ID
-						this.timer1 = setInterval(() => {
-							// 创建子弹
-							const targetNode = proxy[`${bulletKey}`] = document.createElement("div");
-							targetNode.className = "bullet";
-							targetNode.setAttribute("key", bulletKey++);
-							this.$pnode.appendChild(targetNode);
-							// 子弹飞行轨迹速度（bulletX，bulletY，this.bulletYnum，this.delay2）
-							let bulletX = this.el.offsetLeft + this.el.clientWidth / 2,
-								bulletY = this.el.offsetTop - targetNode.offsetHeight;
-							this.style(targetNode, bulletX, bulletY); //解决初始子弹定位;
-							const targetTimer = setInterval(() => {
-								bulletY -= this.bulletYnum > 0 ? this.bulletYnum : 1; // 设置越大子弹间隔越大
-								this.style(targetNode, bulletX, bulletY);
-								// 删除子弹
-								if (targetNode.offsetTop <= -targetNode.offsetHeight) {
-									delete proxy[targetNode.getAttribute("key")]; // 删除飞机对象对应的属性
-									this.$pnode.removeChild(targetNode);
-									clearInterval(targetTimer); // 删除子弹对应的计时器
-								}
-							}, this.delay2)
+						this.bulletTimer = setInterval(() => {
+							if (!this.pauseGame) {
+								// 创建子弹
+								const targetNode = proxy[`${bulletKey}`] = document.createElement("div");
+								targetNode.className = "bullet";
+								targetNode.setAttribute("key", bulletKey++);
+								this.$pnode.appendChild(targetNode);
+								// 子弹飞行轨迹速度（bulletX，bulletY，this.bulletYnum，this.delay2）
+								let bulletX = this.el.offsetLeft + this.el.clientWidth / 2,
+									bulletY = this.el.offsetTop - targetNode.offsetHeight;
+								this.style(targetNode, bulletX, bulletY); //解决初始子弹定位;
+								const targetTimer = setInterval(() => {
+									if (!this.pauseGame) {
+										bulletY -= this.bulletYnum > 0 ? this.bulletYnum : 1; // 设置越大子弹间隔越大
+										this.style(targetNode, bulletX, bulletY);
+										// 删除子弹
+										if (targetNode.offsetTop <= -targetNode.offsetHeight) {
+											delete proxy[targetNode.getAttribute("key")]; // 删除飞机对象对应的属性
+											this.$pnode.removeChild(targetNode);
+											clearInterval(targetTimer); // 删除子弹对应的计时器
+										}
+									}
+								}, this.delay2)
+							}
 						}, this.delay1);
 					}
 					style(targetNode, bulletX, bulletY) {
@@ -241,6 +250,8 @@
 							// 鼠标移动/松开事件监听对象是document！而不是飞机，让飞机跟着鼠标的速度移动，而不是鼠标跟着飞机
 							this.mousemove(intervalX, intervalY);
 							this.mouseup();
+							// 游戏暂停
+							this.pauseGame = false;
 						}
 					}
 					mousemove(intervalX, intervalY) {
@@ -262,8 +273,9 @@
 					}
 					mouseup() {
 						document.onmouseup = (e) => { // 松开鼠标则释放鼠标移动/松开事件 （考虑改为暂停或者取掉不需要按住也可以移动，要不然一直按住是有点累……）？
-							// document.onmousemove = null;
-							// document.onmouseup = null;
+							document.onmousemove = null;
+							document.onmouseup = null;
+							this.pauseGame = true; // 暂停游戏
 						}
 					}
 				}
